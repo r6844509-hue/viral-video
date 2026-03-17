@@ -3,139 +3,436 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Viral video Play now</title>
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Video Player</title>
 
-<!-- Firebase JS SDK -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <style>
-body{ margin:0; background:black; font-family:Arial; color:white; }
-.topbar{ background:#f1f1f1; color:black; padding:10px; font-weight:bold; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
-.video {
+body {
+    background: #000;
+    font-family: Arial, sans-serif;
     height: 100vh;
+    overflow: hidden;
+    user-select: none;
+}
+
+.player-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: #0a0a0a;
+}
+
+.thumbnail {
+    position: absolute;
+    inset: 0;
+    background-image: url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1200&q=80');
+    background-size: cover;
+    background-position: center;
+    filter: brightness(0.55);
+    transition: background-image 0.4s ease;
+}
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 50%, transparent 100%);
+}
+
+.video-title {
+    position: absolute;
+    top: 18px;
+    left: 14px;
+    right: 14px;
+    color: white;
+    font-size: 15px;
+    font-weight: bold;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.9);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.live-badge {
+    background: #e00;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+}
+
+/* প্লে বাটন */
+.play-btn {
+    position: relative;
+    z-index: 10;
+    width: 78px;
+    height: 78px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    border: 2.5px solid rgba(255,255,255,0.85);
     display: flex;
     justify-content: center;
     align-items: center;
-    position: relative;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-image: url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'); 
-    transition: background-image 0.5s ease-in-out; 
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: transform 0.15s ease, background 0.15s ease;
+    box-shadow: 0 0 50px rgba(255,255,255,0.15), 0 0 0 12px rgba(255,255,255,0.05);
+    -webkit-tap-highlight-color: transparent;
 }
 
-.play {
-    width: 120px; height: 120px; border-radius: 50%; border: 3px solid white;
-    display: flex; justify-content: center; align-items: center;
-    font-size: 50px; box-shadow: 0 0 30px white; cursor: pointer;
-    background: rgba(0, 0, 0, 0.4); 
+.play-btn:active {
+    transform: scale(0.92);
+    background: rgba(255,255,255,0.22);
+}
+
+.play-icon {
+    width: 0;
+    height: 0;
+    border-top: 20px solid transparent;
+    border-bottom: 20px solid transparent;
+    border-left: 32px solid white;
+    margin-left: 7px;
+    filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
+}
+
+/* লোডিং স্পিনার */
+.loading-ring {
+    display: none;
     position: relative;
     z-index: 10;
+    width: 78px;
+    height: 78px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.15);
+    border-top-color: white;
+    animation: spin 0.75s linear infinite;
 }
 
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* নিচের কন্ট্রোল বার */
 .controls {
-    position: fixed; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.8);
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     z-index: 10;
+    padding: 10px 14px 24px;
 }
-.progress { height: 6px; background: #333; margin-bottom: 8px; }
-.bar { width: 20%; height: 100%; background: white; }
-.time { display: flex; justify-content: space-between; font-size: 14px; }
+
+.progress-bar {
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: #ff3b3b;
+    border-radius: 2px;
+    transition: width 0.1s linear;
+}
+
+.time-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: rgba(255,255,255,0.85);
+    font-size: 12px;
+}
+
+.center-info {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+}
+
+/* ভিউ কাউন্ট ডট */
+.dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #ff3b3b;
+    margin-right: 4px;
+    vertical-align: middle;
+    animation: blink 1.2s ease-in-out infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+}
 </style>
 </head>
 
 <body>
 
-<div class="video" id="videoBg">
-    <div class="play" onclick="openLink()">▶</div>
-</div>
+<div class="player-wrapper" id="playerWrapper">
+    <div class="thumbnail" id="thumbBg"></div>
+    <div class="overlay"></div>
 
-<div class="controls">
-    <div class="progress"><div class="bar"></div></div>
-    <div class="time"><span>0:11</span><span>8:32</span></div>
+    <div class="video-title">
+        <span class="live-badge">LIVE</span>
+        <span id="videoTitle">Viral Video 2026</span>
+    </div>
+
+    <div class="play-btn" id="playBtn" onclick="handlePlay()">
+        <div class="play-icon"></div>
+    </div>
+
+    <div class="loading-ring" id="loadingRing"></div>
+
+    <div class="controls">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="time-row">
+            <span id="currentTime">0:00</span>
+            <span class="center-info" id="centerInfo">
+                <span class="dot"></span>
+                <span id="viewCount">Loading...</span>
+            </span>
+            <span id="totalTime">10:32</span>
+        </div>
+    </div>
 </div>
 
 <script>
-    // ফায়ারবেস কনফিগ
-    const firebaseConfig = {
-        apiKey: "AIzaSyC2tguQFjkUvncBvn6-e7_Ux5vJ6lEzpjQ",
-        authDomain: "vital-1f05b.firebaseapp.com",
-        databaseURL: "https://vital-1f05b-default-rtdb.firebaseio.com",
-        projectId: "vital-1f05b",
-        storageBucket: "vital-1f05b.firebasestorage.app",
-        messagingSenderId: "992463011532",
-        appId: "1:992463011532:web:708ff147b8e7e1ce5b8c69"
-    };
 
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
-    const db = firebase.database();
-    const maxRedirects = 5;
+// =============================================
+//  FIREBASE CONFIG — আপনার config এখানে
+// =============================================
+const firebaseConfig = {
+    apiKey: "AIzaSyC2tguQFjkUvncBvn6-e7_Ux5vJ6lEzpjQ",
+    authDomain: "vital-1f05b.firebaseapp.com",
+    databaseURL: "https://vital-1f05b-default-rtdb.firebaseio.com",
+    projectId: "vital-1f05b",
+    storageBucket: "vital-1f05b.firebasestorage.app",
+    messagingSenderId: "992463011532",
+    appId: "1:992463011532:web:708ff147b8e7e1ce5b8c69"
+};
 
-    // ডাটাবেস থেকে লিংক লোড করা
-    function fetchSettings() {
-        db.ref('playerSettings').on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                if (data.bgImage && data.bgImage.trim() !== "") {
-                    document.getElementById('videoBg').style.backgroundImage = `url('${data.bgImage}')`;
-                }
-                const links = [data.link1, data.link2, data.link3, data.link4, data.link5];
-                sessionStorage.setItem('targetLinks', JSON.stringify(links));
-            }
-        });
-    }
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-    // 🔴 আসল ম্যাজিক শুরু এখানে (প্লে বাটনে ক্লিক করলে) 🔴
-    function openLink() {
-        let linksData = sessionStorage.getItem('targetLinks');
-        
-        if (!linksData) {
-            alert("ডেটা লোড হচ্ছে, দয়া করে ২ সেকেন্ড অপেক্ষা করুন...");
-            return;
+// =============================================
+//  SETTINGS — চাইলে পরিবর্তন করুন
+// =============================================
+const MAX_REDIRECTS  = 5;    // কতবার redirect হবে
+const AUTO_DELAY_MS  = 350;  // ব্যাক আসার পর কত ms পর অটো redirect (কম = দ্রুত)
+
+// =============================================
+//  STATE
+// =============================================
+let redirecting = false;
+
+// =============================================
+//  bfcache DISABLE — সব ব্রাউজারে ব্যাক ডিটেক্ট করতে
+// =============================================
+window.addEventListener('unload', function() {});
+
+// =============================================
+//  FIREBASE থেকে ডাটা লোড
+// =============================================
+function loadSettings() {
+    db.ref('playerSettings').once('value', (snap) => {
+        const data = snap.val();
+        if (!data) return;
+
+        if (data.bgImage && data.bgImage.trim() !== '') {
+            document.getElementById('thumbBg').style.backgroundImage = `url('${data.bgImage}')`;
+        }
+        if (data.title && data.title.trim() !== '') {
+            document.getElementById('videoTitle').textContent = data.title;
+        }
+        if (data.duration) {
+            document.getElementById('totalTime').textContent = data.duration;
         }
 
-        let targetLinks = JSON.parse(linksData);
+        // ৫টি লিংক সেভ
+        const links = [data.link1, data.link2, data.link3, data.link4, data.link5]
+                       .filter(l => l && l.trim() !== '');
 
-        // ১. অরিজিনাল পেজটাকে মার্ক করা হলো
-        history.replaceState({ original: true }, "", window.location.pathname);
-
-        // ২. ইউজার প্লে বাটনে টাচ করেছে, এই সুযোগে ব্রাউজারে ৪টি ফেক হিস্ট্রি ঢুকিয়ে দেওয়া হলো!
-        // এটি লুপ উল্টো দিক থেকে চলবে (4, 3, 2, 1) যাতে ব্যাক করলে সিরিয়ালে যায়
-        for (let i = targetLinks.length - 1; i >= 1; i--) {
-            history.pushState({ adIndex: i }, "Ad Step " + i, "?step=" + i);
+        if (links.length > 0) {
+            sessionStorage.setItem('adLinks', JSON.stringify(links));
         }
 
-        // ৩. এরপর ১ম লিংকে (Index 0) পাঠিয়ে দেওয়া হলো
-        window.location.href = targetLinks[0] || "https://google.com";
-    }
-
-    // 🔴 ইউজার যখন ব্যাক বাটনে চাপবে, তখন এই পপ-স্টেট ফায়ার হবে 🔴
-    window.addEventListener('popstate', function(event) {
-        let linksData = sessionStorage.getItem('targetLinks');
-        if (!linksData) return;
-        let targetLinks = JSON.parse(linksData);
-
-        // যদি ইউজার আমাদের তৈরি করা ফেক হিস্ট্রিতে এসে পড়ে
-        if (event.state && event.state.adIndex) {
-            let index = event.state.adIndex; // এটি ১, ২, ৩, বা ৪ হবে
-            let nextLink = targetLinks[index] || "https://google.com";
-
-            // ব্রাউজারকে ফাঁকি দেওয়ার জন্য replace ব্যবহার করা হলো
-            window.location.replace(nextLink);
-        }
-        // যদি ৫ বার শেষ হয়ে যায় এবং সে অরিজিনাল পেজে ফিরে আসে
-        else if (event.state && event.state.original) {
-            alert("৫টি এড শেষ! এখন অরিজিনাল ভিডিও প্লে হচ্ছে...");
-            // এখানে আপনার ভিডিও প্লেয়ারের কোড বসিয়ে দিবেন
-        }
+        updateUI();
     });
+}
 
-    // পেজ লোড হলে ডাটা আনা শুরু হবে
-    fetchSettings();
+// =============================================
+//  UI আপডেট
+// =============================================
+function updateUI() {
+    const count = getCount();
+    const remaining = MAX_REDIRECTS - count;
+    if (remaining > 0) {
+        document.getElementById('viewCount').textContent = count + ' visits';
+    } else {
+        document.getElementById('viewCount').textContent = 'Watch now';
+        document.querySelector('.dot').style.background = '#2ecc71';
+    }
+}
+
+function getCount() {
+    return parseInt(sessionStorage.getItem('adCount')) || 0;
+}
+
+function getLinks() {
+    return JSON.parse(sessionStorage.getItem('adLinks') || '[]');
+}
+
+// =============================================
+//  REDIRECT ফাংশন
+// =============================================
+function goToLink(url) {
+    if (redirecting) return;
+    redirecting = true;
+
+    document.getElementById('playBtn').style.display = 'none';
+    document.getElementById('loadingRing').style.display = 'block';
+
+    setTimeout(() => {
+        window.location.href = url; // ✅ href — হিস্ট্রি রাখে
+    }, 180);
+}
+
+// =============================================
+//  প্লে বাটন ক্লিক (ম্যানুয়াল)
+// =============================================
+function handlePlay() {
+    const count = getCount();
+
+    // ৫ বার শেষ — ফেক ভিডিও চালাও
+    if (count >= MAX_REDIRECTS) {
+        playFakeVideo();
+        return;
+    }
+
+    const links = getLinks();
+    if (links.length === 0) {
+        alert("লোড হচ্ছে, একটু অপেক্ষা করুন...");
+        return;
+    }
+
+    const url = links[count % links.length];
+    sessionStorage.setItem('adCount', count + 1);
+    sessionStorage.setItem('comingBack', 'yes');
+    goToLink(url);
+}
+
+// =============================================
+//  ব্যাক আসলে অটো REDIRECT চেক
+// =============================================
+function checkAutoRedirect() {
+    redirecting = false; // রিসেট — নতুন redirect করা যাবে
+
+    if (sessionStorage.getItem('comingBack') !== 'yes') return;
+
+    const count = getCount();
+
+    // ৫ বার পূর্ণ — আর redirect নয়
+    if (count >= MAX_REDIRECTS) {
+        sessionStorage.removeItem('comingBack');
+        updateUI();
+        return;
+    }
+
+    const links = getLinks();
+    if (links.length === 0) return;
+
+    const url = links[count % links.length];
+    sessionStorage.setItem('adCount', count + 1);
+
+    // AUTO_DELAY_MS পর অটো redirect
+    setTimeout(() => {
+        goToLink(url);
+    }, AUTO_DELAY_MS);
+}
+
+// =============================================
+//  ফেক ভিডিও প্লে (৫ বার শেষে দেখাবে)
+// =============================================
+function playFakeVideo() {
+    document.getElementById('playBtn').style.display = 'none';
+    let w = 0;
+    const start = Date.now();
+    const duration = 10000; // 10 সেকেন্ড fake progress
+
+    function tick() {
+        const elapsed = Date.now() - start;
+        w = Math.min((elapsed / duration) * 100, 100);
+        document.getElementById('progressFill').style.width = w + '%';
+
+        // সময় দেখানো
+        const secs = Math.floor((elapsed / 1000));
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        document.getElementById('currentTime').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+
+        if (w < 100) requestAnimationFrame(tick);
+    }
+
+    requestAnimationFrame(tick);
+}
+
+// =============================================
+//  ইভেন্ট লিসেনার
+// =============================================
+
+// pageshow — সব ব্রাউজারে সবচেয়ে নির্ভরযোগ্য
+window.addEventListener('pageshow', function(e) {
+    if (e.persisted) {
+        // bfcache থেকে রিস্টোর → force reload করো
+        // এতে Chrome/Safari তে bfcache bypass হয়
+        window.location.reload();
+        return;
+    }
+    checkAutoRedirect();
+    updateUI();
+});
+
+// ফলব্যাক — visibilitychange (Android Chrome এ কাজে লাগে)
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && !redirecting) {
+        checkAutoRedirect();
+    }
+});
+
+// ফলব্যাক — focus (Desktop browser এ কাজে লাগে)
+window.addEventListener('focus', function() {
+    if (!redirecting) {
+        checkAutoRedirect();
+    }
+});
+
+// =============================================
+//  শুরু
+// =============================================
+updateUI();
+loadSettings();
+
 </script>
-
 </body>
 </html>
