@@ -160,7 +160,7 @@ body {
 </head>
 
 <body>
-<div class="player-wrapper" id="playerWrapper">
+<div class="player-wrapper">
     <div class="thumbnail" id="thumbBg"></div>
     <div class="overlay"></div>
     <div class="video-title">
@@ -188,9 +188,7 @@ body {
 
 <script>
 
-// =============================================
-//  FIREBASE CONFIG
-// =============================================
+// ── FIREBASE CONFIG ──────────────────────────────
 const firebaseConfig = {
     apiKey: "AIzaSyC2tguQFjkUvncBvn6-e7_Ux5vJ6lEzpjQ",
     authDomain: "vital-1f05b.firebaseapp.com",
@@ -200,52 +198,64 @@ const firebaseConfig = {
     messagingSenderId: "992463011532",
     appId: "1:992463011532:web:708ff147b8e7e1ce5b8c69"
 };
-
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// =============================================
-//  CONFIG
-// =============================================
-const MAX_REDIRECTS = 5;
-const AUTO_DELAY_MS = 400; // ব্যাক আসার পর কত ms পর অটো redirect
+// ── CONFIG ───────────────────────────────────────
+const MAX_REDIRECTS = 5;   // মোট কতবার redirect
+const AUTO_DELAY    = 400; // ব্যাক আসার পর কত ms পর অটো যাবে
 
-// =============================================
-//  STATE
-// =============================================
-let redirecting = false;
-let autoTriggered = false; // একই pageshow এ দুইবার না হওয়ার জন্য
+// ── STATE ────────────────────────────────────────
+var redirecting   = false;
+var autoTriggered = false;
 
-// =============================================
-//  bfcache বন্ধ করার জন্য — MOST IMPORTANT
-// =============================================
+// ── bfcache বন্ধ ─────────────────────────────────
 window.addEventListener('unload', function() {});
 window.addEventListener('beforeunload', function() {});
 
-// =============================================
-//  HELPER FUNCTIONS
-// =============================================
+// ── STORAGE: localStorage ব্যবহার করছি ──────────
+// sessionStorage ব্যাক আসলে অনির্ভরযোগ্য, localStorage সবসময় থাকে
+
 function getCount() {
-    return parseInt(sessionStorage.getItem('adCount')) || 0;
+    return parseInt(localStorage.getItem('adCount')) || 0;
 }
 
 function getLinks() {
-    return JSON.parse(sessionStorage.getItem('adLinks') || '[]');
+    return JSON.parse(localStorage.getItem('adLinks') || '[]');
 }
 
+function setCount(n) {
+    localStorage.setItem('adCount', n);
+}
+
+function setLinks(arr) {
+    localStorage.setItem('adLinks', JSON.stringify(arr));
+}
+
+function setComingBack(val) {
+    if (val) {
+        localStorage.setItem('comingBack', 'yes');
+    } else {
+        localStorage.removeItem('comingBack');
+    }
+}
+
+function isComingBack() {
+    return localStorage.getItem('comingBack') === 'yes';
+}
+
+// ── UI আপডেট ─────────────────────────────────────
 function updateUI() {
-    const count = getCount();
+    var count = getCount();
     if (count >= MAX_REDIRECTS) {
         document.getElementById('viewCount').textContent = 'Watch now';
         document.getElementById('dot').style.background = '#2ecc71';
     } else {
-        document.getElementById('viewCount').textContent = count + ' visits';
+        document.getElementById('viewCount').textContent = count + ' / ' + MAX_REDIRECTS + ' visits';
     }
 }
 
-// =============================================
-//  REDIRECT
-// =============================================
+// ── REDIRECT ──────────────────────────────────────
 function goToLink(url) {
     if (redirecting) return;
     redirecting = true;
@@ -253,73 +263,64 @@ function goToLink(url) {
     document.getElementById('playBtn').style.display = 'none';
     document.getElementById('loadingRing').style.display = 'block';
 
-    // ✅ শুধু href — replace() নয়
     setTimeout(function() {
         window.location.href = url;
     }, 150);
 }
 
-// =============================================
-//  PLAY বাটন ক্লিক
-// =============================================
+// ── PLAY বাটন ক্লিক ──────────────────────────────
 function handlePlay() {
-    const count = getCount();
+    var count = getCount();
 
     if (count >= MAX_REDIRECTS) {
         playFakeVideo();
         return;
     }
 
-    const links = getLinks();
+    var links = getLinks();
     if (links.length === 0) {
         alert("লোড হচ্ছে, একটু অপেক্ষা করুন...");
         return;
     }
 
-    const url = links[count % links.length];
-    sessionStorage.setItem('adCount', count + 1);
-    sessionStorage.setItem('comingBack', 'yes');
+    var url = links[count % links.length];
+    setCount(count + 1);
+    setComingBack(true);
     autoTriggered = false;
     goToLink(url);
 }
 
-// =============================================
-//  ব্যাক আসলে AUTO REDIRECT
-// =============================================
+// ── ব্যাক আসলে AUTO REDIRECT ─────────────────────
 function checkAutoRedirect() {
-    // ✅ একই ইভেন্টে দুইবার trigger হবে না
     if (autoTriggered) return;
     autoTriggered = true;
+    redirecting = false;
 
-    redirecting = false; // রিসেট
+    if (!isComingBack()) return;
 
-    if (sessionStorage.getItem('comingBack') !== 'yes') return;
-
-    const count = getCount();
+    var count = getCount();
 
     if (count >= MAX_REDIRECTS) {
-        sessionStorage.removeItem('comingBack');
+        setComingBack(false);
         updateUI();
         return;
     }
 
-    const links = getLinks();
+    var links = getLinks();
     if (links.length === 0) return;
 
-    const url = links[count % links.length];
-    sessionStorage.setItem('adCount', count + 1);
+    var url = links[count % links.length];
+    setCount(count + 1);
 
     setTimeout(function() {
         goToLink(url);
-    }, AUTO_DELAY_MS);
+    }, AUTO_DELAY);
 }
 
-// =============================================
-//  FIREBASE থেকে সেটিংস লোড
-// =============================================
+// ── FIREBASE থেকে সেটিংস ─────────────────────────
 function loadSettings() {
     db.ref('playerSettings').once('value', function(snap) {
-        const data = snap.val();
+        var data = snap.val();
         if (!data) return;
 
         if (data.bgImage && data.bgImage.trim() !== '') {
@@ -332,55 +333,58 @@ function loadSettings() {
             document.getElementById('totalTime').textContent = data.duration;
         }
 
-        const links = [data.link1, data.link2, data.link3, data.link4, data.link5]
-                       .filter(function(l) { return l && l.trim() !== ''; });
+        var links = [data.link1, data.link2, data.link3, data.link4, data.link5]
+                    .filter(function(l) { return l && l.trim() !== ''; });
 
         if (links.length > 0) {
-            sessionStorage.setItem('adLinks', JSON.stringify(links));
+            setLinks(links);
+        }
+
+        // Firebase লোড হওয়ার পরে আবার চেক করো
+        // (প্রথম pageshow এ links না থাকলে এখানে ধরা পড়বে)
+        if (isComingBack() && getCount() < MAX_REDIRECTS) {
+            autoTriggered = false;
+            checkAutoRedirect();
         }
 
         updateUI();
     });
 }
 
-// =============================================
-//  FAKE VIDEO (৫ বার শেষে)
-// =============================================
+// ── FAKE VIDEO ────────────────────────────────────
 function playFakeVideo() {
     document.getElementById('playBtn').style.display = 'none';
-    const start = Date.now();
-    const duration = 10000;
+    var start = Date.now();
+    var duration = 10000;
     function tick() {
-        const elapsed = Date.now() - start;
-        const w = Math.min((elapsed / duration) * 100, 100);
+        var elapsed = Date.now() - start;
+        var w = Math.min((elapsed / duration) * 100, 100);
         document.getElementById('progressFill').style.width = w + '%';
-        const secs = Math.floor(elapsed / 1000);
-        const m = Math.floor(secs / 60);
-        const s = secs % 60;
+        var secs = Math.floor(elapsed / 1000);
+        var m = Math.floor(secs / 60);
+        var s = secs % 60;
         document.getElementById('currentTime').textContent = m + ':' + (s < 10 ? '0' : '') + s;
         if (w < 100) requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
 }
 
-// =============================================
-//  ইভেন্ট লিসেনার
-// =============================================
+// ── ইভেন্ট লিসেনার ───────────────────────────────
 
-// ✅ FIX: persisted হলেও reload() নয়, সরাসরি checkAutoRedirect()
+// মেইন — pageshow (সব ব্রাউজারে সবচেয়ে নির্ভরযোগ্য)
 window.addEventListener('pageshow', function(e) {
-    autoTriggered = false; // প্রতিটা pageshow এ রিসেট
+    autoTriggered = false; // প্রতি pageshow এ রিসেট
     checkAutoRedirect();
     updateUI();
 });
 
-// ফলব্যাক ১ — Android Chrome
+// ফলব্যাক ১ — Android Chrome bfcache
 document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && !redirecting) {
         setTimeout(function() {
             autoTriggered = false;
             checkAutoRedirect();
-        }, 100);
+        }, 200);
     }
 });
 
@@ -390,13 +394,11 @@ window.addEventListener('focus', function() {
         setTimeout(function() {
             autoTriggered = false;
             checkAutoRedirect();
-        }, 100);
+        }, 200);
     }
 });
 
-// =============================================
-//  শুরু
-// =============================================
+// ── শুরু ──────────────────────────────────────────
 updateUI();
 loadSettings();
 
