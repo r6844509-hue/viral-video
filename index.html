@@ -13,7 +13,6 @@
 
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
 body {
     background: #000;
     font-family: Arial, sans-serif;
@@ -21,7 +20,6 @@ body {
     overflow: hidden;
     user-select: none;
 }
-
 .player-wrapper {
     position: relative;
     width: 100%;
@@ -32,7 +30,6 @@ body {
     align-items: center;
     background: #0a0a0a;
 }
-
 .thumbnail {
     position: absolute;
     inset: 0;
@@ -42,13 +39,11 @@ body {
     filter: brightness(0.55);
     transition: background-image 0.4s ease;
 }
-
 .overlay {
     position: absolute;
     inset: 0;
     background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 50%, transparent 100%);
 }
-
 .video-title {
     position: absolute;
     top: 18px;
@@ -63,7 +58,6 @@ body {
     align-items: center;
     gap: 8px;
 }
-
 .live-badge {
     background: #e00;
     color: white;
@@ -73,8 +67,6 @@ body {
     border-radius: 3px;
     letter-spacing: 0.5px;
 }
-
-/* প্লে বাটন */
 .play-btn {
     position: relative;
     z-index: 10;
@@ -93,12 +85,10 @@ body {
     box-shadow: 0 0 50px rgba(255,255,255,0.15), 0 0 0 12px rgba(255,255,255,0.05);
     -webkit-tap-highlight-color: transparent;
 }
-
 .play-btn:active {
     transform: scale(0.92);
     background: rgba(255,255,255,0.22);
 }
-
 .play-icon {
     width: 0;
     height: 0;
@@ -108,8 +98,6 @@ body {
     margin-left: 7px;
     filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
 }
-
-/* লোডিং স্পিনার */
 .loading-ring {
     display: none;
     position: relative;
@@ -121,21 +109,13 @@ body {
     border-top-color: white;
     animation: spin 0.75s linear infinite;
 }
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* নিচের কন্ট্রোল বার */
+@keyframes spin { to { transform: rotate(360deg); } }
 .controls {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: 0; left: 0; right: 0;
     z-index: 10;
     padding: 10px 14px 24px;
 }
-
 .progress-bar {
     width: 100%;
     height: 3px;
@@ -144,7 +124,6 @@ body {
     margin-bottom: 10px;
     overflow: hidden;
 }
-
 .progress-fill {
     height: 100%;
     width: 0%;
@@ -152,7 +131,6 @@ body {
     border-radius: 2px;
     transition: width 0.1s linear;
 }
-
 .time-row {
     display: flex;
     justify-content: space-between;
@@ -160,14 +138,11 @@ body {
     color: rgba(255,255,255,0.85);
     font-size: 12px;
 }
-
 .center-info {
     font-size: 11px;
     color: rgba(255,255,255,0.5);
     text-align: center;
 }
-
-/* ভিউ কাউন্ট ডট */
 .dot {
     display: inline-block;
     width: 6px; height: 6px;
@@ -177,7 +152,6 @@ body {
     vertical-align: middle;
     animation: blink 1.2s ease-in-out infinite;
 }
-
 @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.2; }
@@ -186,30 +160,25 @@ body {
 </head>
 
 <body>
-
 <div class="player-wrapper" id="playerWrapper">
     <div class="thumbnail" id="thumbBg"></div>
     <div class="overlay"></div>
-
     <div class="video-title">
         <span class="live-badge">LIVE</span>
         <span id="videoTitle">Viral Video 2026</span>
     </div>
-
     <div class="play-btn" id="playBtn" onclick="handlePlay()">
         <div class="play-icon"></div>
     </div>
-
     <div class="loading-ring" id="loadingRing"></div>
-
     <div class="controls">
         <div class="progress-bar">
             <div class="progress-fill" id="progressFill"></div>
         </div>
         <div class="time-row">
             <span id="currentTime">0:00</span>
-            <span class="center-info" id="centerInfo">
-                <span class="dot"></span>
+            <span class="center-info">
+                <span class="dot" id="dot"></span>
                 <span id="viewCount">Loading...</span>
             </span>
             <span id="totalTime">10:32</span>
@@ -220,7 +189,7 @@ body {
 <script>
 
 // =============================================
-//  FIREBASE CONFIG — আপনার config এখানে
+//  FIREBASE CONFIG
 // =============================================
 const firebaseConfig = {
     apiKey: "AIzaSyC2tguQFjkUvncBvn6-e7_Ux5vJ6lEzpjQ",
@@ -236,65 +205,26 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // =============================================
-//  SETTINGS — চাইলে পরিবর্তন করুন
+//  CONFIG
 // =============================================
-const MAX_REDIRECTS  = 5;    // কতবার redirect হবে
-const AUTO_DELAY_MS  = 350;  // ব্যাক আসার পর কত ms পর অটো redirect (কম = দ্রুত)
+const MAX_REDIRECTS = 5;
+const AUTO_DELAY_MS = 400; // ব্যাক আসার পর কত ms পর অটো redirect
 
 // =============================================
 //  STATE
 // =============================================
 let redirecting = false;
+let autoTriggered = false; // একই pageshow এ দুইবার না হওয়ার জন্য
 
 // =============================================
-//  bfcache DISABLE — সব ব্রাউজারে ব্যাক ডিটেক্ট করতে
+//  bfcache বন্ধ করার জন্য — MOST IMPORTANT
 // =============================================
 window.addEventListener('unload', function() {});
+window.addEventListener('beforeunload', function() {});
 
 // =============================================
-//  FIREBASE থেকে ডাটা লোড
+//  HELPER FUNCTIONS
 // =============================================
-function loadSettings() {
-    db.ref('playerSettings').once('value', (snap) => {
-        const data = snap.val();
-        if (!data) return;
-
-        if (data.bgImage && data.bgImage.trim() !== '') {
-            document.getElementById('thumbBg').style.backgroundImage = `url('${data.bgImage}')`;
-        }
-        if (data.title && data.title.trim() !== '') {
-            document.getElementById('videoTitle').textContent = data.title;
-        }
-        if (data.duration) {
-            document.getElementById('totalTime').textContent = data.duration;
-        }
-
-        // ৫টি লিংক সেভ
-        const links = [data.link1, data.link2, data.link3, data.link4, data.link5]
-                       .filter(l => l && l.trim() !== '');
-
-        if (links.length > 0) {
-            sessionStorage.setItem('adLinks', JSON.stringify(links));
-        }
-
-        updateUI();
-    });
-}
-
-// =============================================
-//  UI আপডেট
-// =============================================
-function updateUI() {
-    const count = getCount();
-    const remaining = MAX_REDIRECTS - count;
-    if (remaining > 0) {
-        document.getElementById('viewCount').textContent = count + ' visits';
-    } else {
-        document.getElementById('viewCount').textContent = 'Watch now';
-        document.querySelector('.dot').style.background = '#2ecc71';
-    }
-}
-
 function getCount() {
     return parseInt(sessionStorage.getItem('adCount')) || 0;
 }
@@ -303,8 +233,18 @@ function getLinks() {
     return JSON.parse(sessionStorage.getItem('adLinks') || '[]');
 }
 
+function updateUI() {
+    const count = getCount();
+    if (count >= MAX_REDIRECTS) {
+        document.getElementById('viewCount').textContent = 'Watch now';
+        document.getElementById('dot').style.background = '#2ecc71';
+    } else {
+        document.getElementById('viewCount').textContent = count + ' visits';
+    }
+}
+
 // =============================================
-//  REDIRECT ফাংশন
+//  REDIRECT
 // =============================================
 function goToLink(url) {
     if (redirecting) return;
@@ -313,18 +253,18 @@ function goToLink(url) {
     document.getElementById('playBtn').style.display = 'none';
     document.getElementById('loadingRing').style.display = 'block';
 
-    setTimeout(() => {
-        window.location.href = url; // ✅ href — হিস্ট্রি রাখে
-    }, 180);
+    // ✅ শুধু href — replace() নয়
+    setTimeout(function() {
+        window.location.href = url;
+    }, 150);
 }
 
 // =============================================
-//  প্লে বাটন ক্লিক (ম্যানুয়াল)
+//  PLAY বাটন ক্লিক
 // =============================================
 function handlePlay() {
     const count = getCount();
 
-    // ৫ বার শেষ — ফেক ভিডিও চালাও
     if (count >= MAX_REDIRECTS) {
         playFakeVideo();
         return;
@@ -339,20 +279,24 @@ function handlePlay() {
     const url = links[count % links.length];
     sessionStorage.setItem('adCount', count + 1);
     sessionStorage.setItem('comingBack', 'yes');
+    autoTriggered = false;
     goToLink(url);
 }
 
 // =============================================
-//  ব্যাক আসলে অটো REDIRECT চেক
+//  ব্যাক আসলে AUTO REDIRECT
 // =============================================
 function checkAutoRedirect() {
-    redirecting = false; // রিসেট — নতুন redirect করা যাবে
+    // ✅ একই ইভেন্টে দুইবার trigger হবে না
+    if (autoTriggered) return;
+    autoTriggered = true;
+
+    redirecting = false; // রিসেট
 
     if (sessionStorage.getItem('comingBack') !== 'yes') return;
 
     const count = getCount();
 
-    // ৫ বার পূর্ণ — আর redirect নয়
     if (count >= MAX_REDIRECTS) {
         sessionStorage.removeItem('comingBack');
         updateUI();
@@ -365,35 +309,57 @@ function checkAutoRedirect() {
     const url = links[count % links.length];
     sessionStorage.setItem('adCount', count + 1);
 
-    // AUTO_DELAY_MS পর অটো redirect
-    setTimeout(() => {
+    setTimeout(function() {
         goToLink(url);
     }, AUTO_DELAY_MS);
 }
 
 // =============================================
-//  ফেক ভিডিও প্লে (৫ বার শেষে দেখাবে)
+//  FIREBASE থেকে সেটিংস লোড
+// =============================================
+function loadSettings() {
+    db.ref('playerSettings').once('value', function(snap) {
+        const data = snap.val();
+        if (!data) return;
+
+        if (data.bgImage && data.bgImage.trim() !== '') {
+            document.getElementById('thumbBg').style.backgroundImage = "url('" + data.bgImage + "')";
+        }
+        if (data.title && data.title.trim() !== '') {
+            document.getElementById('videoTitle').textContent = data.title;
+        }
+        if (data.duration) {
+            document.getElementById('totalTime').textContent = data.duration;
+        }
+
+        const links = [data.link1, data.link2, data.link3, data.link4, data.link5]
+                       .filter(function(l) { return l && l.trim() !== ''; });
+
+        if (links.length > 0) {
+            sessionStorage.setItem('adLinks', JSON.stringify(links));
+        }
+
+        updateUI();
+    });
+}
+
+// =============================================
+//  FAKE VIDEO (৫ বার শেষে)
 // =============================================
 function playFakeVideo() {
     document.getElementById('playBtn').style.display = 'none';
-    let w = 0;
     const start = Date.now();
-    const duration = 10000; // 10 সেকেন্ড fake progress
-
+    const duration = 10000;
     function tick() {
         const elapsed = Date.now() - start;
-        w = Math.min((elapsed / duration) * 100, 100);
+        const w = Math.min((elapsed / duration) * 100, 100);
         document.getElementById('progressFill').style.width = w + '%';
-
-        // সময় দেখানো
-        const secs = Math.floor((elapsed / 1000));
+        const secs = Math.floor(elapsed / 1000);
         const m = Math.floor(secs / 60);
         const s = secs % 60;
         document.getElementById('currentTime').textContent = m + ':' + (s < 10 ? '0' : '') + s;
-
         if (w < 100) requestAnimationFrame(tick);
     }
-
     requestAnimationFrame(tick);
 }
 
@@ -401,29 +367,30 @@ function playFakeVideo() {
 //  ইভেন্ট লিসেনার
 // =============================================
 
-// pageshow — সব ব্রাউজারে সবচেয়ে নির্ভরযোগ্য
+// ✅ FIX: persisted হলেও reload() নয়, সরাসরি checkAutoRedirect()
 window.addEventListener('pageshow', function(e) {
-    if (e.persisted) {
-        // bfcache থেকে রিস্টোর → force reload করো
-        // এতে Chrome/Safari তে bfcache bypass হয়
-        window.location.reload();
-        return;
-    }
+    autoTriggered = false; // প্রতিটা pageshow এ রিসেট
     checkAutoRedirect();
     updateUI();
 });
 
-// ফলব্যাক — visibilitychange (Android Chrome এ কাজে লাগে)
+// ফলব্যাক ১ — Android Chrome
 document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && !redirecting) {
-        checkAutoRedirect();
+        setTimeout(function() {
+            autoTriggered = false;
+            checkAutoRedirect();
+        }, 100);
     }
 });
 
-// ফলব্যাক — focus (Desktop browser এ কাজে লাগে)
+// ফলব্যাক ২ — Desktop
 window.addEventListener('focus', function() {
     if (!redirecting) {
-        checkAutoRedirect();
+        setTimeout(function() {
+            autoTriggered = false;
+            checkAutoRedirect();
+        }, 100);
     }
 });
 
